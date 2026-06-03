@@ -8,7 +8,7 @@ A full-stack clinical data analytics application that integrates a trained Machi
 ## 📊 Live Dashboard Preview
 
 <div align="center">
-  <img src="static/Screenshot 2026-06-01 232022.png" alt="Clinical Portal Dashboard" width="800">
+  <img src="prediction_app/Screenshot 2026-06-01 232022.png" alt="Clinical Portal Dashboard" width="800">
 </div>
 
 ---
