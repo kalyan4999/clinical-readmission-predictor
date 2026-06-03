@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Readmission Predictor Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .bg-primary-gradient { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+    </style>
+</head>
+<body>
+
+    <div class="container py-5">
+        <div class="card bg-primary-gradient text-white text-center p-4 mb-4">
+            <h1 class="fw-bold m-0">🏥 Clinical Readmission Risk Portal</h1>
+            <p class="text-white-50 m-0 mt-1 text-uppercase tracking-wider small">Predictive Decision Support Engine</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card p-4 h-100">
+                    <h4 class="text-muted fw-bold mb-4">Patient Clinical Metrics</h4>
+                    <form method="POST" action="/">
+                        {% csrf_token %}
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">1. Patient Age</label>
+                                <input type="number" name="age" class="form-control form-control-lg border-secondary-subtle" min="0" max="120" value="{{ inputs.age|default:62 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">2. Days Spent in Hospital</label>
+                                <input type="number" name="time_in_hospital" class="form-control form-control-lg border-secondary-subtle" min="1" max="100" value="{{ inputs.time_in_hospital|default:5 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">3. Total Lab Tests Done</label>
+                                <input type="number" name="num_lab_procedures" class="form-control form-control-lg border-secondary-subtle" min="1" max="200" value="{{ inputs.num_lab_procedures|default:42 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">4. Number of Medications</label>
+                                <input type="number" name="num_medications" class="form-control form-control-lg border-secondary-subtle" min="0" max="100" value="{{ inputs.num_medications|default:14 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">5. Number of Other Medical Conditions</label>
+                                <input type="number" name="number_diagnoses" class="form-control form-control-lg border-secondary-subtle" min="1" max="30" value="{{ inputs.number_diagnoses|default:4 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary">6. Main Reason for Admission</label>
+                                <select name="primary_diagnosis" class="form-select form-select-lg border-secondary-subtle">
+                                    <option value="0" {% if inputs.primary_diagnosis == "0" %}selected{% endif %}>Heart / Cardiovascular Issue</option>
+                                    <option value="1" {% if inputs.primary_diagnosis == "1" %}selected{% endif %}>Diabetes / Endocrine Issue</option>
+                                    <option value="2" {% if inputs.primary_diagnosis == "2" %}selected{% endif %}>Injury / Trauma</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mt-5 fw-bold shadow-sm text-uppercase">Execute Clinical Risk Inference</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card p-4 h-100 text-center justify-content-between">
+                    {% if prediction_text %}
+                        <div>
+                            <h4 class="text-muted fw-bold mb-3">Analysis Output</h4>
+                            
+                            {% if "High" in prediction_text %}
+                                <div class="alert alert-danger border-0 py-3 mb-4">
+                                    <h5 class="fw-bold m-0 text-danger">{{ prediction_text }}</h5>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-success border-0 py-3 mb-4">
+                                    <h5 class="fw-bold m-0 text-success">{{ prediction_text }}</h5>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4" style="max-height: 220px; position: relative; margin: auto;">
+                            <canvas id="riskDonutChart"></canvas>
+                        </div>
+
+                        <div style="max-height: 220px;">
+                            <canvas id="metricsBarChart"></canvas>
+                        </div>
+
+                    {% else %}
+                        <div class="my-auto py-5 text-muted">
+                            <h2 class="display-3">📊</h2>
+                            <h5>Awaiting Clinical Data Injection</h5>
+                            <p class="small text-secondary px-4">Fill out the patient metrics on the left and execute the inference engine to render the predictive data visualizations.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if probability %}
+    <script>
+        // 1. Donut Chart Implementation for Risk Probability
+        const probScore = parseFloat("{{ probability }}");
+        const remainingScore = (100 - probScore).toFixed(1);
+        const isHighRisk = "{{ prediction_text }}".includes("High");
+        const themeColor = isHighRisk ? '#dc3545' : '#198754';
+
+        new Chart(document.getElementById('riskDonutChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Readmission Risk %', 'Safe Baseline %'],
+                datasets: [{
+                    data: [probScore, remainingScore],
+                    backgroundColor: [themeColor, '#e9ecef'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: true, text: 'Calculated Machine Learning Probability Index', font: { size: 14, weight: 'bold' } }
+                },
+                cutout: '70%'
+            }
+        });
+
+        // 2. Bar Chart Implementation for Metrics vs Baselines
+        new Chart(document.getElementById('metricsBarChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Hospital Days', 'Lab Tests Done', 'Medications'],
+                datasets: [
+                    {
+                        label: 'Current Patient',
+                        data: [parseInt("{{ inputs.time_in_hospital }}"), parseInt("{{ inputs.num_lab_procedures }}"), parseInt("{{ inputs.num_medications }}")],
+                        backgroundColor: '#2a5298'
+                    },
+                    {
+                        label: 'Hospital Average',
+                        data: [4, 43, 16], // Generic operational baselines
+                        backgroundColor: '#ced4da'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: true, text: 'Metrics vs Group Baseline Deviation', font: { size: 14, weight: 'bold' } }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
